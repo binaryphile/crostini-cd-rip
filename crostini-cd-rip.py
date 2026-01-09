@@ -384,7 +384,9 @@ def print_toc(ripper):
     info = ripper.inquiry()
     if info:
         print(f"\nDevice: {info['vendor']} {info['product']} (rev {info['revision']})")
-        print(f"Type: {'CD-ROM' if info['type'] == 5 else f'Unknown ({info[\"type\"]})'}")
+        device_type = info['type']
+        type_str = 'CD-ROM' if device_type == 5 else f'Unknown ({device_type})'
+        print(f"Type: {type_str}")
 
     if not ripper.test_unit_ready():
         print("\nNo disc in drive or drive not ready")
