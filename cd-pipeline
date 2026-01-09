@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+
+# Help
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'EOF'
+Usage: cd-pipeline [cd-encode options]
+
+Rip CD to WAV, encode to MP3, clean up.
+
+Options are passed to cd-encode:
+  -q N        LAME VBR quality (0-9, default 2)
+  -dest DIR   Destination directory (default ~/Music)
+  -search Q   Manual album search instead of disc ID
+  -v          Verbose output
+  --dry-run   Show what would be done
+
+Examples:
+  cd-pipeline                     # Rip and encode with defaults
+  cd-pipeline -q 0                # High quality
+  cd-pipeline -search "Artist Album"
+EOF
+    exit 0
+fi
+
+# Create temp dir (respects TMPDIR env var)
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT INT TERM
+
+echo "=== Ripping to $WORKDIR ==="
+cd-rip -o "$WORKDIR" || { echo "Rip failed"; exit 1; }
+
+echo ""
+echo "=== Encoding ==="
+cd-encode "$@" "$WORKDIR" || {
+    echo "Encode failed. WAVs preserved: $WORKDIR"
+    trap - EXIT  # Cancel cleanup
+    exit 1
+}
+
+echo ""
+echo "=== Done (temp files cleaned) ==="
