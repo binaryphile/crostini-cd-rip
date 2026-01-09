@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Find sibling binaries (cd-rip, cd-encode in same dir as this script)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Help
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
@@ -28,11 +31,11 @@ WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT INT TERM
 
 echo "=== Ripping to $WORKDIR ==="
-cd-rip -o "$WORKDIR" || { echo "Rip failed"; exit 1; }
+"$SCRIPT_DIR/cd-rip" -o "$WORKDIR" || { echo "Rip failed"; exit 1; }
 
 echo ""
 echo "=== Encoding ==="
-cd-encode "$@" "$WORKDIR" || {
+"$SCRIPT_DIR/cd-encode" "$@" "$WORKDIR" || {
     echo "Encode failed. WAVs preserved: $WORKDIR"
     trap - EXIT  # Cancel cleanup
     exit 1
