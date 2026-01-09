@@ -427,8 +427,8 @@ def main():
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=27,
-        help="Frames per USB transfer (default: 27, try 50-100 for speed)"
+        default=75,
+        help="Frames per USB transfer (default: 75, optimal range: 50-150)"
     )
     parser.add_argument(
         "--vendor-id",

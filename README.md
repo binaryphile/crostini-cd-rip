@@ -86,11 +86,24 @@ Convert to MP3 with:
 for f in *.wav; do lame -V 2 "$f" "${f%.wav}.mp3"; done
 ```
 
+## Performance
+
+Benchmarked chunk sizes (frames per USB transfer):
+
+| Chunk | Speed | Notes |
+|-------|-------|-------|
+| 10 | 121 f/s | High USB overhead |
+| 20 | 287 f/s | Improving |
+| 50-150 | ~317 f/s | **Optimal** (drive-limited) |
+| 200 | 306 f/s | Buffer issues |
+
+Default is 75 frames. At ~317 frames/sec, a 60-minute CD rips in ~14 minutes.
+
 ## Limitations
 
 - No MusicBrainz/CDDB lookup (yet)
 - No automatic MP3 encoding (use lame separately)
-- Slower than native cdparanoia (USB overhead + small chunk sizes)
+- Slower than native cdparanoia (~4x realtime vs ~20x)
 - No error correction/paranoia mode (yet)
 
 ## License
