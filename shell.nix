@@ -2,13 +2,14 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    python3
-    python3Packages.pyusb
-    lame  # For MP3 encoding
+    go
+    libusb1
+    pkg-config  # for gousb CGO
+    lame
   ];
 
   shellHook = ''
-    echo "crostini-cd-rip development environment"
-    echo "Run: ./crostini-cd-rip.py --help"
+    echo "crostini-cd-rip Go development environment"
+    echo "Run: go build ./cmd/cd-rip && ./cd-rip --help"
   '';
 }

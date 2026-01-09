@@ -8,47 +8,89 @@ ChromeOS's Linux container (Crostini) can detect USB CD drives at the SCSI level
 
 ## The Solution
 
-This tool bypasses the kernel entirely by:
-1. Detaching the `usb-storage` kernel driver
-2. Communicating directly with the USB device via PyUSB/libusb
-3. Sending SCSI commands (INQUIRY, READ TOC, READ CD) over USB Mass Storage Bulk-Only protocol
-4. Extracting raw audio data and saving as WAV files
+Two Go binaries that bypass the kernel entirely:
+
+```
+cd-rip       USB CD → WAV extraction via SCSI
+    │
+    ▼
+cd-encode    MusicBrainz lookup → lame → ID3 tags → ~/Music
+```
+
+### cd-rip
+
+- Detaches the `usb-storage` kernel driver
+- Communicates directly with USB device via gousb/libusb
+- Sends SCSI commands (INQUIRY, READ TOC, READ CD) over USB Mass Storage Bulk-Only protocol
+- Extracts raw audio data and saves as WAV files
+- Calculates MusicBrainz disc ID
+
+### cd-encode
+
+- Looks up album metadata on MusicBrainz using disc ID
+- Encodes WAV to MP3 using lame (VBR quality)
+- Writes ID3v2.4 tags (artist, album, title, track, year)
+- Renames files to convention: `Artist-Album-NN-Title.mp3`
+- Moves to ~/Music
 
 ## Requirements
 
 - ChromeOS with Crostini (Linux container) enabled
 - USB CD/DVD drive shared with Linux container
-- Python 3 with PyUSB
+- Go 1.21+, libusb, lame
 
 ### Nix (recommended)
 
 ```bash
-nix-shell -p python3 python3Packages.pyusb
+nix-shell  # Uses shell.nix
 ```
 
-### Pip
+### Manual
 
 ```bash
-pip install pyusb
+# Debian/Ubuntu
+sudo apt install libusb-1.0-0-dev lame
+
+# Build
+go build -o cd-rip ./cmd/cd-rip
+go build -o cd-encode ./cmd/cd-encode
 ```
 
 ## Usage
 
+### Ripping
+
 ```bash
 # Basic usage - rip all tracks to /tmp/cd-rip
-./crostini-cd-rip.py
+./cd-rip
 
 # Specify output directory
-./crostini-cd-rip.py -o ~/Music/rip
+./cd-rip -o ~/Music/rip
 
 # Rip specific tracks
-./crostini-cd-rip.py -t 1,3,5
+./cd-rip -t 1,3,5
 
 # Show TOC only (don't rip)
-./crostini-cd-rip.py --toc
+./cd-rip --toc
 
-# Adjust chunk size for speed (default: 27 frames)
-./crostini-cd-rip.py --chunk-size 50
+# Adjust chunk size for speed (default: 75 frames)
+./cd-rip --chunk-size 100
+```
+
+### Encoding
+
+```bash
+# Encode with MusicBrainz lookup
+./cd-encode /tmp/cd-rip
+
+# Preview without encoding
+./cd-encode --dry-run /tmp/cd-rip
+
+# Custom destination
+./cd-encode --dest ~/Music/New /tmp/cd-rip
+
+# Adjust quality (0-9, lower is better)
+./cd-encode -q 0 /tmp/cd-rip
 ```
 
 ## How It Works
@@ -61,10 +103,32 @@ pip install pyusb
 
 ┌─────────────────────────────────────────────────────────────┐
 │                   Crostini (this tool)                      │
-│  App → PyUSB → libusb → /dev/bus/usb/X/Y → USB device      │
+│  App → gousb → libusb → /dev/bus/usb/X/Y → USB device      │
 │         ↓                                                   │
 │    SCSI commands via USB Mass Storage CBW/CSW protocol      │
 └─────────────────────────────────────────────────────────────┘
+```
+
+## Output Files
+
+### cd-rip output
+
+```
+/tmp/cd-rip/
+├── track01.wav
+├── track02.wav
+├── ...
+├── discid.txt      # MusicBrainz disc ID
+└── toc.json        # CD table of contents
+```
+
+### cd-encode output
+
+```
+~/Music/
+├── Artist-Album-01-Song_Title.mp3
+├── Artist-Album-02-Another_Song.mp3
+└── ...
 ```
 
 ## Supported Devices
@@ -73,18 +137,6 @@ Tested with:
 - Hitachi-LG GP65NB60 (USB ID: 0e8d:1887)
 
 Should work with any USB CD/DVD drive that supports standard SCSI MMC commands.
-
-## Output
-
-By default, tracks are saved as WAV files:
-- `track01.wav`
-- `track02.wav`
-- etc.
-
-Convert to MP3 with:
-```bash
-for f in *.wav; do lame -V 2 "$f" "${f%.wav}.mp3"; done
-```
 
 ## Performance
 
@@ -99,12 +151,20 @@ Benchmarked chunk sizes (frames per USB transfer):
 
 Default is 75 frames. At ~317 frames/sec, a 60-minute CD rips in ~14 minutes.
 
-## Limitations
+## Project Structure
 
-- No MusicBrainz/CDDB lookup (yet)
-- No automatic MP3 encoding (use lame separately)
-- Slower than native cdparanoia (~4x realtime vs ~20x)
-- No error correction/paranoia mode (yet)
+```
+├── cmd/
+│   ├── cd-rip/         # USB ripper CLI
+│   └── cd-encode/      # Encoder CLI
+├── internal/
+│   ├── cdda/           # TOC, disc ID, WAV (pure functions)
+│   ├── scsi/           # USB/SCSI protocol
+│   ├── encode/         # Naming, tagging, lame
+│   └── musicbrainz/    # MusicBrainz API client
+├── shell.nix
+└── go.mod
+```
 
 ## License
 
