@@ -9,32 +9,36 @@ import (
 
 // TrackMeta contains metadata for a track to be tagged
 type TrackMeta struct {
-	Artist      string
-	AlbumArtist string // For compilations - empty means same as Artist
-	Album       string
-	Title       string
-	TrackNum    int
-	TrackTotal  int
-	DiscNum     int // 0 = single disc
-	DiscTotal   int // 0 = single disc
-	Year        int
-	Genre       string
-	Compilation bool
+	Artist       string
+	AlbumArtist  string // For compilations - empty means same as Artist
+	Album        string
+	Title        string
+	TrackNum     int
+	TrackTotal   int
+	DiscNum      int // 0 = single disc
+	DiscTotal    int // 0 = single disc
+	Year         int
+	Genre        string
+	Compilation  bool
+	CoverArt     []byte // Optional album cover (JPEG/PNG)
+	CoverArtMIME string // MIME type (image/jpeg or image/png)
 }
 
 // TagSet contains the ID3 tags to be written
 type TagSet struct {
-	Artist      string
-	AlbumArtist string
-	Album       string
-	Title       string
-	TrackNum    int
-	TrackTotal  int
-	DiscNum     int
-	DiscTotal   int
-	Year        int
-	Genre       string
-	Compilation bool
+	Artist       string
+	AlbumArtist  string
+	Album        string
+	Title        string
+	TrackNum     int
+	TrackTotal   int
+	DiscNum      int
+	DiscTotal    int
+	Year         int
+	Genre        string
+	Compilation  bool
+	CoverArt     []byte
+	CoverArtMIME string
 }
 
 // BuildTags creates a TagSet from track metadata.
@@ -42,17 +46,19 @@ type TagSet struct {
 // No I/O is performed - use Apply() to write tags to a file.
 func BuildTags(meta TrackMeta) TagSet {
 	return TagSet{
-		Artist:      meta.Artist,
-		AlbumArtist: meta.AlbumArtist,
-		Album:       meta.Album,
-		Title:       meta.Title,
-		TrackNum:    meta.TrackNum,
-		TrackTotal:  meta.TrackTotal,
-		DiscNum:     meta.DiscNum,
-		DiscTotal:   meta.DiscTotal,
-		Year:        meta.Year,
-		Genre:       meta.Genre,
-		Compilation: meta.Compilation,
+		Artist:       meta.Artist,
+		AlbumArtist:  meta.AlbumArtist,
+		Album:        meta.Album,
+		Title:        meta.Title,
+		TrackNum:     meta.TrackNum,
+		TrackTotal:   meta.TrackTotal,
+		DiscNum:      meta.DiscNum,
+		DiscTotal:    meta.DiscTotal,
+		Year:         meta.Year,
+		Genre:        meta.Genre,
+		Compilation:  meta.Compilation,
+		CoverArt:     meta.CoverArt,
+		CoverArtMIME: meta.CoverArtMIME,
 	}
 }
 
@@ -106,6 +112,22 @@ func (t TagSet) Apply(filepath string) error {
 	// Compilation flag (TCMP)
 	if t.Compilation {
 		tag.AddTextFrame("TCMP", id3v2.EncodingUTF8, "1")
+	}
+
+	// Cover art (APIC)
+	if len(t.CoverArt) > 0 {
+		mimeType := t.CoverArtMIME
+		if mimeType == "" {
+			mimeType = "image/jpeg" // Fallback
+		}
+		pic := id3v2.PictureFrame{
+			Encoding:    id3v2.EncodingUTF8,
+			MimeType:    mimeType,
+			PictureType: id3v2.PTFrontCover,
+			Description: "Cover",
+			Picture:     t.CoverArt,
+		}
+		tag.AddAttachedPicture(pic)
 	}
 
 	if err := tag.Save(); err != nil {

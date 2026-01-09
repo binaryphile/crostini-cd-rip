@@ -3,6 +3,7 @@ package musicbrainz
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"go.uploadedlobster.com/mbtypes"
@@ -31,7 +32,8 @@ type Track struct {
 
 // Client wraps the MusicBrainz API
 type Client struct {
-	client *musicbrainzws2.Client
+	client    *musicbrainzws2.Client
+	userAgent string // For Cover Art Archive requests
 }
 
 // NewClient creates a new MusicBrainz API client
@@ -41,7 +43,8 @@ func NewClient(appName, version, contact string) *Client {
 		Version: version,
 		URL:     contact,
 	})
-	return &Client{client: client}
+	userAgent := fmt.Sprintf("%s/%s (%s)", appName, version, contact)
+	return &Client{client: client, userAgent: userAgent}
 }
 
 // Close releases client resources
@@ -159,6 +162,25 @@ func getTotalTracks(media []musicbrainzws2.Medium) int {
 		total += m.TrackCount
 	}
 	return total
+}
+
+// SortReleasesByTrackMatch sorts releases so those matching targetTrackCount come first,
+// then by year (newest first). Returns a new sorted slice (does not modify input).
+func SortReleasesByTrackMatch(releases []Release, targetTrackCount int) []Release {
+	// Copy to avoid modifying input
+	sorted := make([]Release, len(releases))
+	copy(sorted, releases)
+
+	sort.SliceStable(sorted, func(i, j int) bool {
+		iMatch := sorted[i].TrackCount == targetTrackCount
+		jMatch := sorted[j].TrackCount == targetTrackCount
+		if iMatch != jMatch {
+			return iMatch // Exact matches first
+		}
+		return sorted[i].Year > sorted[j].Year // Then by year (newest first)
+	})
+
+	return sorted
 }
 
 // Search searches for releases by text query (artist, album, etc).

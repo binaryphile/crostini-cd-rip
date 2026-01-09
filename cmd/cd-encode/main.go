@@ -119,15 +119,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Sort releases: exact track count matches first, then by year (newest first)
+	releases = musicbrainz.SortReleasesByTrackMatch(releases, len(wavFiles))
+
 	// Present options
 	var release *musicbrainz.Release
 	if len(releases) == 1 {
-		fmt.Printf("Found: %s - %s (%d)\n", releases[0].Artist, releases[0].Title, releases[0].Year)
+		fmt.Printf("Found: %s - %s (%d, %d tracks)\n", releases[0].Artist, releases[0].Title, releases[0].Year, releases[0].TrackCount)
 		release = &releases[0]
 	} else {
 		fmt.Printf("\nFound %d releases:\n", len(releases))
 		for i, r := range releases {
-			fmt.Printf("  %d. %s - %s (%d, %s)\n", i+1, r.Artist, r.Title, r.Year, r.Country)
+			fmt.Printf("  %d. %s - %s (%d, %s, %d tracks)\n", i+1, r.Artist, r.Title, r.Year, r.Country, r.TrackCount)
 		}
 		fmt.Print("\nSelect release (1): ")
 
@@ -150,6 +153,18 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to get track info: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Fetch cover art (optional)
+	fmt.Print("Fetching cover art... ")
+	coverArt, coverMIME, err := client.GetCoverArt(release.MBID)
+	if err != nil {
+		fmt.Printf("Warning: %v\n", err)
+		coverArt = nil // Ensure we continue without cover
+	} else if coverArt == nil {
+		fmt.Println("not available")
+	} else {
+		fmt.Printf("OK (%d KB, %s)\n", len(coverArt)/1024, coverMIME)
 	}
 
 	// Validate track count
@@ -239,14 +254,16 @@ func main() {
 
 		// Tag
 		tags := encode.BuildTags(encode.TrackMeta{
-			Artist:      trackArtist,
-			AlbumArtist: fullRelease.Artist,
-			Album:       fullRelease.Title,
-			Title:       trackTitle,
-			TrackNum:    trackNum,
-			TrackTotal:  len(fullRelease.Tracks),
-			Year:        fullRelease.Year,
-			Compilation: fullRelease.Compilation,
+			Artist:       trackArtist,
+			AlbumArtist:  fullRelease.Artist,
+			Album:        fullRelease.Title,
+			Title:        trackTitle,
+			TrackNum:     trackNum,
+			TrackTotal:   len(fullRelease.Tracks),
+			Year:         fullRelease.Year,
+			Compilation:  fullRelease.Compilation,
+			CoverArt:     coverArt,
+			CoverArtMIME: coverMIME,
 		})
 
 		if err := tags.Apply(tempMP3); err != nil {

@@ -126,6 +126,51 @@ func TestGetTotalTracks_Single(t *testing.T) {
 	}
 }
 
+func TestSortReleasesByTrackMatch(t *testing.T) {
+	releases := []Release{
+		{Title: "Box Set", TrackCount: 38, Year: 2017},
+		{Title: "Vol 2", TrackCount: 12, Year: 1994},
+		{Title: "Vol 1 GB", TrackCount: 12, Year: 1992},
+		{Title: "Vol 1 US", TrackCount: 12, Year: 1992},
+		{Title: "Best Of", TrackCount: 13, Year: 2001},
+	}
+
+	// Sort for 12-track target
+	sorted := SortReleasesByTrackMatch(releases, 12)
+
+	// First 3 should be 12-track releases
+	for i := 0; i < 3; i++ {
+		if sorted[i].TrackCount != 12 {
+			t.Errorf("sorted[%d].TrackCount = %d, want 12", i, sorted[i].TrackCount)
+		}
+	}
+
+	// 12-track releases should be sorted by year (newest first)
+	if sorted[0].Year != 1994 {
+		t.Errorf("sorted[0].Year = %d, want 1994 (newest 12-track)", sorted[0].Year)
+	}
+
+	// Non-matching should come after
+	if sorted[3].TrackCount == 12 {
+		t.Error("sorted[3] should not be 12-track")
+	}
+}
+
+func TestSortReleasesByTrackMatch_NoMatches(t *testing.T) {
+	releases := []Release{
+		{Title: "A", TrackCount: 10, Year: 2020},
+		{Title: "B", TrackCount: 15, Year: 2019},
+	}
+
+	// Sort for 12-track target (no matches)
+	sorted := SortReleasesByTrackMatch(releases, 12)
+
+	// Should sort by year (newest first) when no matches
+	if sorted[0].Year != 2020 {
+		t.Errorf("sorted[0].Year = %d, want 2020", sorted[0].Year)
+	}
+}
+
 func TestRelease_Struct(t *testing.T) {
 	// Verify Release struct can hold expected data
 	r := Release{

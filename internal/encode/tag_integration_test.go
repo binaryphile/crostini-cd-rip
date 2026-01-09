@@ -125,3 +125,150 @@ func TestTagSet_Apply_Compilation(t *testing.T) {
 		t.Errorf("Compilation flag = %q, want %q", tcmp.Text, "1")
 	}
 }
+
+func TestTagSet_Apply_WithCoverArt(t *testing.T) {
+	if !LameAvailable() {
+		t.Skip("lame not installed")
+	}
+
+	tmpDir, _ := os.MkdirTemp("", "tag-test-")
+	defer os.RemoveAll(tmpDir)
+
+	// Create MP3
+	samples := make([]byte, 2352)
+	wavData := cdda.WriteWAV(samples)
+	wavPath := filepath.Join(tmpDir, "test.wav")
+	os.WriteFile(wavPath, wavData, 0644)
+
+	mp3Path := filepath.Join(tmpDir, "test.mp3")
+	EncodeWAV(wavPath, mp3Path, DefaultEncodeOptions())
+
+	// Fake JPEG data (just needs to be non-empty for test)
+	coverData := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F'}
+
+	// Apply tags with cover art
+	tags := BuildTags(TrackMeta{
+		Artist:       "Artist",
+		Album:        "Album",
+		Title:        "Title",
+		TrackNum:     1,
+		CoverArt:     coverData,
+		CoverArtMIME: "image/jpeg",
+	})
+
+	if err := tags.Apply(mp3Path); err != nil {
+		t.Fatalf("Apply failed: %v", err)
+	}
+
+	// Read back and verify APIC frame exists
+	tag, _ := id3v2.Open(mp3Path, id3v2.Options{Parse: true})
+	defer tag.Close()
+
+	pics := tag.GetFrames(tag.CommonID("Attached picture"))
+	if len(pics) == 0 {
+		t.Fatal("No APIC frame found")
+	}
+
+	pic, ok := pics[0].(id3v2.PictureFrame)
+	if !ok {
+		t.Fatal("Could not cast to PictureFrame")
+	}
+
+	if pic.MimeType != "image/jpeg" {
+		t.Errorf("MIME type = %q, want %q", pic.MimeType, "image/jpeg")
+	}
+	if len(pic.Picture) != len(coverData) {
+		t.Errorf("Picture size = %d, want %d", len(pic.Picture), len(coverData))
+	}
+	if pic.PictureType != id3v2.PTFrontCover {
+		t.Errorf("PictureType = %d, want %d (front cover)", pic.PictureType, id3v2.PTFrontCover)
+	}
+}
+
+func TestTagSet_Apply_WithPNGCover(t *testing.T) {
+	if !LameAvailable() {
+		t.Skip("lame not installed")
+	}
+
+	tmpDir, _ := os.MkdirTemp("", "tag-test-")
+	defer os.RemoveAll(tmpDir)
+
+	// Create MP3
+	samples := make([]byte, 2352)
+	wavData := cdda.WriteWAV(samples)
+	wavPath := filepath.Join(tmpDir, "test.wav")
+	os.WriteFile(wavPath, wavData, 0644)
+
+	mp3Path := filepath.Join(tmpDir, "test.mp3")
+	EncodeWAV(wavPath, mp3Path, DefaultEncodeOptions())
+
+	// Fake PNG data (PNG magic bytes)
+	coverData := []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}
+
+	// Apply tags with PNG cover art
+	tags := BuildTags(TrackMeta{
+		Artist:       "Artist",
+		Album:        "Album",
+		Title:        "Title",
+		TrackNum:     1,
+		CoverArt:     coverData,
+		CoverArtMIME: "image/png",
+	})
+
+	if err := tags.Apply(mp3Path); err != nil {
+		t.Fatalf("Apply failed: %v", err)
+	}
+
+	// Read back and verify PNG MIME type
+	tag, _ := id3v2.Open(mp3Path, id3v2.Options{Parse: true})
+	defer tag.Close()
+
+	pics := tag.GetFrames(tag.CommonID("Attached picture"))
+	if len(pics) == 0 {
+		t.Fatal("No APIC frame found")
+	}
+
+	pic := pics[0].(id3v2.PictureFrame)
+	if pic.MimeType != "image/png" {
+		t.Errorf("MIME type = %q, want %q", pic.MimeType, "image/png")
+	}
+}
+
+func TestTagSet_Apply_NoCoverArt(t *testing.T) {
+	if !LameAvailable() {
+		t.Skip("lame not installed")
+	}
+
+	tmpDir, _ := os.MkdirTemp("", "tag-test-")
+	defer os.RemoveAll(tmpDir)
+
+	// Create MP3
+	samples := make([]byte, 2352)
+	wavData := cdda.WriteWAV(samples)
+	wavPath := filepath.Join(tmpDir, "test.wav")
+	os.WriteFile(wavPath, wavData, 0644)
+
+	mp3Path := filepath.Join(tmpDir, "test.mp3")
+	EncodeWAV(wavPath, mp3Path, DefaultEncodeOptions())
+
+	// Apply tags WITHOUT cover art
+	tags := BuildTags(TrackMeta{
+		Artist:   "Artist",
+		Album:    "Album",
+		Title:    "Title",
+		TrackNum: 1,
+	})
+
+	if err := tags.Apply(mp3Path); err != nil {
+		t.Fatalf("Apply failed: %v", err)
+	}
+
+	// Read back and verify NO APIC frame
+	tag, _ := id3v2.Open(mp3Path, id3v2.Options{Parse: true})
+	defer tag.Close()
+
+	pics := tag.GetFrames(tag.CommonID("Attached picture"))
+	if len(pics) != 0 {
+		t.Errorf("Expected no APIC frames, got %d", len(pics))
+	}
+}

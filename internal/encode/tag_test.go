@@ -111,3 +111,40 @@ func TestBuildTags_Genre(t *testing.T) {
 		t.Errorf("Genre = %q, want %q", tags.Genre, "Metal")
 	}
 }
+
+func TestBuildTags_CoverArt(t *testing.T) {
+	// Cover art should pass through unchanged
+	coverData := []byte{0xFF, 0xD8, 0xFF, 0xE0} // JPEG magic bytes
+	tags := BuildTags(TrackMeta{
+		Artist:       "Artist",
+		Album:        "Album",
+		Title:        "Title",
+		TrackNum:     1,
+		CoverArt:     coverData,
+		CoverArtMIME: "image/jpeg",
+	})
+
+	if len(tags.CoverArt) != len(coverData) {
+		t.Errorf("CoverArt length = %d, want %d", len(tags.CoverArt), len(coverData))
+	}
+	if tags.CoverArtMIME != "image/jpeg" {
+		t.Errorf("CoverArtMIME = %q, want %q", tags.CoverArtMIME, "image/jpeg")
+	}
+}
+
+func TestBuildTags_NoCoverArt(t *testing.T) {
+	// No cover art should result in nil/empty
+	tags := BuildTags(TrackMeta{
+		Artist:   "Artist",
+		Album:    "Album",
+		Title:    "Title",
+		TrackNum: 1,
+	})
+
+	if tags.CoverArt != nil {
+		t.Errorf("CoverArt should be nil, got %d bytes", len(tags.CoverArt))
+	}
+	if tags.CoverArtMIME != "" {
+		t.Errorf("CoverArtMIME should be empty, got %q", tags.CoverArtMIME)
+	}
+}
