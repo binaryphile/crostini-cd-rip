@@ -203,7 +203,111 @@ Compilation       →  true if Artist == "Various Artists"
 | Cover art file not found | Warning: proceed without cover |
 | Cover art not JPEG/PNG | Warning: skip cover art |
 
-### 2.6 Files to Create/Modify
+### 2.6 Code Sketches
+
+**Album struct** (`internal/metadata/metadata.go`):
+```go
+type Album struct {
+    Artist     string  `json:"artist"`
+    AlbumTitle string  `json:"album"`
+    Year       string  `json:"year"`
+    Genre      string  `json:"genre"`
+    Disc       int     `json:"disc"`
+    TotalDiscs int     `json:"totalDiscs"`
+    TotalTracks int    `json:"totalTracks"`
+    CoverArt   string  `json:"coverArt"`
+    Tracks     []Track `json:"tracks"`
+}
+
+type Track struct {
+    Num    int    `json:"num"`
+    Title  string `json:"title"`
+    Artist string `json:"artist"`
+}
+```
+
+**ToRelease()** - Convert JSON Album to musicbrainz.Release:
+```go
+func (a *Album) ToRelease() *musicbrainz.Release {
+    year, _ := strconv.Atoi(a.Year)  // ignore error, default 0
+
+    tracks := make([]musicbrainz.Track, len(a.Tracks))
+    for i, t := range a.Tracks {
+        tracks[i] = musicbrainz.Track{
+            Num:    t.Num,
+            Title:  t.Title,
+            Artist: t.Artist,
+        }
+    }
+
+    return &musicbrainz.Release{
+        Title:       a.AlbumTitle,
+        Artist:      a.Artist,
+        Year:        year,
+        TrackCount:  len(a.Tracks),
+        DiscCount:   a.TotalDiscs,
+        Tracks:      tracks,
+        Compilation: a.Artist == "Various Artists",
+    }
+}
+```
+
+**Validate()** - Check required fields and track count:
+```go
+func (a *Album) Validate(wavCount int) []error {
+    var errs []error
+    if a.Artist == "" {
+        errs = append(errs, errors.New("missing required field: artist"))
+    }
+    if a.AlbumTitle == "" {
+        errs = append(errs, errors.New("missing required field: album"))
+    }
+    if len(a.Tracks) == 0 {
+        errs = append(errs, errors.New("missing required field: tracks"))
+    }
+    if len(a.Tracks) != wavCount {
+        errs = append(errs, fmt.Errorf("track count mismatch: JSON has %d, found %d WAV files",
+            len(a.Tracks), wavCount))
+    }
+    if a.Artist == "Various Artists" {
+        for i, t := range a.Tracks {
+            if t.Artist == "" {
+                errs = append(errs, fmt.Errorf("track %d missing artist (required for compilations)", i+1))
+            }
+        }
+    }
+    return errs
+}
+```
+
+**LoadCoverArt()** - Read cover image file:
+```go
+func (a *Album) LoadCoverArt() ([]byte, string, error) {
+    if a.CoverArt == "" {
+        return nil, "", nil  // No cover art specified
+    }
+    data, err := os.ReadFile(a.CoverArt)
+    if err != nil {
+        return nil, "", fmt.Errorf("cover art: %w", err)
+    }
+    mime := detectMIME(a.CoverArt)
+    return data, mime, nil
+}
+
+func detectMIME(path string) string {
+    ext := strings.ToLower(filepath.Ext(path))
+    switch ext {
+    case ".jpg", ".jpeg":
+        return "image/jpeg"
+    case ".png":
+        return "image/png"
+    default:
+        return "image/jpeg"  // fallback
+    }
+}
+```
+
+### 2.7 Files to Create/Modify
 
 | File | Change |
 |------|--------|
@@ -226,3 +330,12 @@ Compilation       →  true if Artist == "Various Artists"
 - `standard_album.json`, `compilation.json`, `multi_disc.json`
 - `missing_artist.json`, `malformed.json`
 - `cover.jpg`, `cover.png`
+
+---
+
+## Maintenance Notes
+
+**Living document**: This design doc should be updated when UC4 is implemented:
+- Change Part 2 status from "Planned" to "Implemented"
+- Update code sketches with actual line numbers
+- Add any implementation deviations or learnings
