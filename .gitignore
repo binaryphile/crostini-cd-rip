@@ -4,3 +4,7 @@ __pycache__/
 *.mp3
 .nix-*
 result
+
+# Binaries
+cd-rip
+cd-encode
