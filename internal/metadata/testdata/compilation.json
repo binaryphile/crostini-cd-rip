@@ -1,0 +1,13 @@
+{
+  "artist": "Various Artists",
+  "album": "Ultra Mix - Dance Hits Of The 80's And 90's",
+  "year": "1999",
+  "genre": "Dance",
+  "disc": 2,
+  "totalDiscs": 2,
+  "tracks": [
+    {"num": 1, "artist": "C + C Music Factory", "title": "Gonna Make You Sweat (Everybody Dance Now)"},
+    {"num": 2, "artist": "EMF", "title": "Unbelievable"},
+    {"num": 3, "artist": "Technotronic", "title": "Pump Up The Jam"}
+  ]
+}

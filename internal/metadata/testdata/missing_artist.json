@@ -1,0 +1,9 @@
+{
+  "album": "Some Album",
+  "year": "2000",
+  "tracks": [
+    {"num": 1, "title": "Song 1"},
+    {"num": 2, "title": "Song 2"},
+    {"num": 3, "title": "Song 3"}
+  ]
+}

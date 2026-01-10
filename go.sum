@@ -1,3 +1,5 @@
+github.com/binaryphile/fluentfp v0.6.0 h1:a+K746kItpVPoPlQ6GfQfvK6xKIEH5wTzHjcerTBXGk=
+github.com/binaryphile/fluentfp v0.6.0/go.mod h1:vPlnsRESNRr67jS4EWGwMI8Gn/o50x35dGQjN/xWqcw=
 github.com/bogem/id3v2/v2 v2.1.4 h1:CEwe+lS2p6dd9UZRlPc1zbFNIha2mb2qzT1cCEoNWoI=
 github.com/bogem/id3v2/v2 v2.1.4/go.mod h1:l+gR8MZ6rc9ryPTPkX77smS5Me/36gxkMgDayZ9G1vY=
 github.com/go-resty/resty/v2 v2.17.1 h1:x3aMpHK1YM9e4va/TMDRlusDDoZiQ+ViDu/WpA6xTM4=

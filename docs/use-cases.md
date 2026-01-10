@@ -19,7 +19,7 @@
 | User | Rip CD to WAV files | Blue | Implemented |
 | User | View CD table of contents | Blue | Implemented |
 | User | Encode WAVs with MusicBrainz metadata | Blue | Implemented |
-| User | Encode WAVs with manual metadata JSON | Blue | **Planned** |
+| User | Encode WAVs with manual metadata JSON | Blue | Implemented |
 | User | Encode compilation album | Blue | Implemented |
 | User | Handle multi-disc album | Blue | Implemented |
 | User | Fire-and-forget rip+encode | Blue | Implemented |
@@ -47,16 +47,25 @@ User runs `cd-encode /tmp/cd-rip`. System reads discid.txt, queries MusicBrainz,
 - Multiple releases match → present menu for user selection
 - No cover art available → continue without embedding art
 
-### UC4: Encode with Manual Metadata (Planned)
+### UC4: Encode with Manual Metadata (Implemented)
 
 User provides metadata as JSON (extracted by LLM from Discogs/other source), runs `cd-encode --metadata metadata.json /tmp/cd-rip`. System reads structured metadata, encodes with provided artist/album/tracks.
 
-**Proposed CLI:** `cd-encode --metadata <metadata.json>`
+**CLI:** `cd-encode --metadata <metadata.json> [--strict] <input-dir>`
+
+**Flags:**
+- `--metadata` - JSON file with album/track metadata (bypasses MusicBrainz)
+- `--strict` - Exit on validation errors (default: warn and proceed)
 
 **Why LLM extraction vs coded parser:**
 - Format-agnostic (handles Discogs markdown, HTML, other sources)
 - No fragile parsing code to maintain
 - Adapts to source format changes automatically
+
+**Extensions:**
+- Track count mismatch → warning (or fatal with `--strict`)
+- Missing required field → warning (or fatal with `--strict`)
+- Cover art file not found → warning, proceed without cover
 
 See [metadata-format.md](metadata-format.md) for JSON schema and LLM extraction instructions.
 

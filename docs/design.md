@@ -132,7 +132,7 @@ type TrackMeta struct {
 
 ## Part 2: UC4 Implementation Design (`--metadata`)
 
-**Status**: Planned
+**Status**: Implemented
 
 ### 2.1 Feature Summary
 
@@ -241,19 +241,21 @@ func ParseJSON(path string) (*Album, error) {
 }
 ```
 
-**ToRelease()** - Convert JSON Album to musicbrainz.Release:
+**ToRelease()** - Convert JSON Album to musicbrainz.Release (uses FluentFP):
 ```go
+import "github.com/binaryphile/fluentfp/slice"
+
 func (a *Album) ToRelease() *musicbrainz.Release {
     year, _ := strconv.Atoi(a.Year)  // ignore error, default 0
 
-    tracks := make([]musicbrainz.Track, len(a.Tracks))
-    for i, t := range a.Tracks {
-        tracks[i] = musicbrainz.Track{
+    // slice.MapTo[R](input).To(fn) maps []Track → []musicbrainz.Track
+    tracks := slice.MapTo[musicbrainz.Track](a.Tracks).To(func(t Track) musicbrainz.Track {
+        return musicbrainz.Track{
             Num:    t.Num,
             Title:  t.Title,
             Artist: t.Artist,
         }
-    }
+    })
 
     return &musicbrainz.Release{
         Title:       a.AlbumTitle,
@@ -322,13 +324,14 @@ func detectMIME(path string) string {
 }
 ```
 
-### 2.7 Files to Create/Modify
+### 2.7 Files Created/Modified
 
-| File | Change |
+| File | Status |
 |------|--------|
-| `cmd/cd-encode/main.go` | Add `--metadata` flag, branch on flag |
-| `internal/metadata/metadata.go` | Album/Track structs, ParseJSON, ToRelease, Validate |
-| `internal/metadata/metadata_test.go` | Unit tests |
+| `cmd/cd-encode/main.go` | ✓ Added `--metadata` and `--strict` flags |
+| `internal/metadata/metadata.go` | ✓ Created (120 LOC) |
+| `internal/metadata/metadata_test.go` | ✓ Created (17 tests) |
+| `internal/metadata/testdata/` | ✓ Created (5 JSON files, 2 images) |
 
 ### 2.7 Testing Strategy
 
@@ -350,7 +353,9 @@ func detectMIME(path string) string {
 
 ## Maintenance Notes
 
-**Living document**: This design doc should be updated when UC4 is implemented:
-- Change Part 2 status from "Planned" to "Implemented"
-- Update code sketches with actual line numbers
-- Add any implementation deviations or learnings
+**UC4 Implementation** (completed):
+- `internal/metadata/metadata.go` - 120 LOC
+- `internal/metadata/metadata_test.go` - 17 tests
+- `cmd/cd-encode/main.go` - Added `--metadata` and `--strict` flags
+- Uses FluentFP `slice.MapTo[R]().To()` for track mapping
+- Error handling: warnings by default, `--strict` for fatal errors

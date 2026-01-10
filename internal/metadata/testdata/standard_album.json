@@ -1,0 +1,12 @@
+{
+  "artist": "Pink Floyd",
+  "album": "The Dark Side of the Moon",
+  "year": "1973",
+  "genre": "Progressive Rock",
+  "tracks": [
+    {"num": 1, "title": "Speak to Me"},
+    {"num": 2, "title": "Breathe"},
+    {"num": 3, "title": "On the Run"},
+    {"num": 4, "title": "Time"}
+  ]
+}

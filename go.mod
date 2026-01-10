@@ -3,6 +3,7 @@ module github.com/binaryphile/crostini-cd-rip
 go 1.25.5
 
 require (
+	github.com/binaryphile/fluentfp v0.6.0
 	github.com/bogem/id3v2/v2 v2.1.4
 	github.com/google/gousb v1.1.3
 	go.uploadedlobster.com/mbtypes v0.4.0

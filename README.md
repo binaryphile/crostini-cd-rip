@@ -91,6 +91,12 @@ go build -o cd-encode ./cmd/cd-encode
 
 # Adjust quality (0-9, lower is better)
 ./cd-encode -q 0 /tmp/cd-rip
+
+# Use manual metadata (bypasses MusicBrainz)
+./cd-encode --metadata /tmp/metadata.json /tmp/cd-rip
+
+# Strict mode - exit on validation errors
+./cd-encode --metadata /tmp/metadata.json --strict /tmp/cd-rip
 ```
 
 ## How It Works
@@ -161,6 +167,7 @@ Default is 75 frames. At ~317 frames/sec, a 60-minute CD rips in ~14 minutes.
 │   ├── cdda/           # TOC, disc ID, WAV (pure functions)
 │   ├── scsi/           # USB/SCSI protocol
 │   ├── encode/         # Naming, tagging, lame
+│   ├── metadata/       # JSON metadata parsing
 │   └── musicbrainz/    # MusicBrainz API client
 ├── shell.nix
 └── go.mod

@@ -1,0 +1,14 @@
+{
+  "artist": "The Beatles",
+  "album": "The White Album",
+  "year": "1968",
+  "genre": "Rock",
+  "disc": 1,
+  "totalDiscs": 2,
+  "totalTracks": 17,
+  "tracks": [
+    {"num": 1, "title": "Back in the U.S.S.R."},
+    {"num": 2, "title": "Dear Prudence"},
+    {"num": 3, "title": "Glass Onion"}
+  ]
+}

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/binaryphile/crostini-cd-rip/internal/encode"
+	"github.com/binaryphile/crostini-cd-rip/internal/metadata"
 	"github.com/binaryphile/crostini-cd-rip/internal/musicbrainz"
 )
 
@@ -35,6 +36,9 @@ func main() {
 
 	verbose := flag.Bool("v", false, "Verbose output")
 	flag.BoolVar(verbose, "verbose", false, "Verbose output")
+
+	metadataFile := flag.String("metadata", "", "JSON metadata file (bypasses MusicBrainz)")
+	strict := flag.Bool("strict", false, "Exit on validation errors (default: warn and proceed)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [flags] <input-dir>\n\n", os.Args[0])
@@ -73,9 +77,9 @@ func main() {
 	fmt.Println(strings.Repeat("=", 60))
 	fmt.Printf("Input: %s (%d WAV files)\n", inputDir, len(wavFiles))
 
-	// Get disc ID (not needed if using --search)
+	// Get disc ID (not needed if using --search or --metadata)
 	var discID string
-	if *search == "" {
+	if *search == "" && *metadataFile == "" {
 		discIDPath := *discIDFile
 		if discIDPath == "" {
 			discIDPath = filepath.Join(inputDir, "discid.txt")
@@ -83,7 +87,7 @@ func main() {
 
 		data, err := os.ReadFile(discIDPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "No disc ID found. Use --search or create discid.txt\n")
+			fmt.Fprintf(os.Stderr, "No disc ID found. Use --search, --metadata, or create discid.txt\n")
 			os.Exit(1)
 		}
 		discID = strings.TrimSpace(string(data))
@@ -96,81 +100,131 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Lookup on MusicBrainz
-	client := musicbrainz.NewClient(appName, appVersion, appURL)
-	defer client.Close()
+	// Variables for metadata (populated by either --metadata or MusicBrainz)
+	var fullRelease *musicbrainz.Release
+	var coverArt []byte
+	var coverMIME string
+	var discNum int  // Current disc number (for filenames)
+	var genre string // From JSON (not in Release)
 
-	var releases []musicbrainz.Release
-
-	if *search != "" {
-		fmt.Printf("Searching MusicBrainz for: %s\n", *search)
-		releases, err = client.Search(*search)
-	} else {
-		fmt.Println("Looking up on MusicBrainz...")
-		releases, err = client.LookupByDiscID(discID)
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "MusicBrainz lookup failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	if len(releases) == 0 {
-		fmt.Fprintln(os.Stderr, "No releases found. Try --search \"Artist Album\"")
-		os.Exit(1)
-	}
-
-	// Sort releases: exact track count matches first, then by year (newest first)
-	releases = musicbrainz.SortReleasesByTrackMatch(releases, len(wavFiles))
-
-	// Present options
-	var release *musicbrainz.Release
-	if len(releases) == 1 {
-		fmt.Printf("Found: %s - %s (%d, %d tracks)\n", releases[0].Artist, releases[0].Title, releases[0].Year, releases[0].TrackCount)
-		release = &releases[0]
-	} else {
-		fmt.Printf("\nFound %d releases:\n", len(releases))
-		for i, r := range releases {
-			fmt.Printf("  %d. %s - %s (%d, %s, %d tracks)\n", i+1, r.Artist, r.Title, r.Year, r.Country, r.TrackCount)
+	if *metadataFile != "" {
+		// Use manual metadata from JSON file
+		fmt.Printf("Loading metadata from: %s\n", *metadataFile)
+		album, err := metadata.ParseJSON(*metadataFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
 		}
-		fmt.Print("\nSelect release (1): ")
 
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-
-		choice := 1
-		if input != "" {
-			if n, err := strconv.Atoi(input); err == nil && n >= 1 && n <= len(releases) {
-				choice = n
+		// Validate and warn
+		if errs := album.Validate(len(wavFiles)); len(errs) > 0 {
+			for _, e := range errs {
+				fmt.Fprintf(os.Stderr, "Warning: %v\n", e)
+			}
+			if *strict {
+				fmt.Fprintln(os.Stderr, "Validation failed (--strict mode)")
+				os.Exit(1)
 			}
 		}
-		release = &releases[choice-1]
-	}
 
-	// Get full track info
-	fmt.Println("\nFetching track details...")
-	fullRelease, err := client.GetReleaseTracks(release.MBID)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get track info: %v\n", err)
-		os.Exit(1)
-	}
+		fullRelease = album.ToRelease()
+		discNum = album.Disc
+		genre = album.Genre
 
-	// Fetch cover art (optional)
-	fmt.Print("Fetching cover art... ")
-	coverArt, coverMIME, err := client.GetCoverArt(release.MBID)
-	if err != nil {
-		fmt.Printf("Warning: %v\n", err)
-		coverArt = nil // Ensure we continue without cover
-	} else if coverArt == nil {
-		fmt.Println("not available")
+		// Load cover art if specified
+		if album.CoverArt != "" {
+			fmt.Print("Loading cover art... ")
+			coverArt, coverMIME, err = album.LoadCoverArt()
+			if err != nil {
+				fmt.Printf("Warning: %v\n", err)
+			} else {
+				fmt.Printf("OK (%d KB, %s)\n", len(coverArt)/1024, coverMIME)
+			}
+		}
+
+		fmt.Printf("Album: %s - %s (%d)\n", fullRelease.Artist, fullRelease.Title, fullRelease.Year)
+		if discNum > 0 {
+			fmt.Printf("Disc: %d of %d\n", discNum, fullRelease.DiscCount)
+		}
 	} else {
-		fmt.Printf("OK (%d KB, %s)\n", len(coverArt)/1024, coverMIME)
-	}
+		// Use MusicBrainz lookup
+		client := musicbrainz.NewClient(appName, appVersion, appURL)
+		defer client.Close()
 
-	// Validate track count
-	if len(fullRelease.Tracks) != len(wavFiles) {
-		fmt.Fprintf(os.Stderr, "Warning: Track count mismatch (%d WAV files, %d tracks in release)\n",
-			len(wavFiles), len(fullRelease.Tracks))
+		var releases []musicbrainz.Release
+
+		if *search != "" {
+			fmt.Printf("Searching MusicBrainz for: %s\n", *search)
+			releases, err = client.Search(*search)
+		} else {
+			fmt.Println("Looking up on MusicBrainz...")
+			releases, err = client.LookupByDiscID(discID)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "MusicBrainz lookup failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		if len(releases) == 0 {
+			fmt.Fprintln(os.Stderr, "No releases found. Try --search \"Artist Album\" or --metadata file.json")
+			os.Exit(1)
+		}
+
+		// Sort releases: exact track count matches first, then by year (newest first)
+		releases = musicbrainz.SortReleasesByTrackMatch(releases, len(wavFiles))
+
+		// Present options
+		var release *musicbrainz.Release
+		if len(releases) == 1 {
+			fmt.Printf("Found: %s - %s (%d, %d tracks)\n", releases[0].Artist, releases[0].Title, releases[0].Year, releases[0].TrackCount)
+			release = &releases[0]
+		} else {
+			fmt.Printf("\nFound %d releases:\n", len(releases))
+			for i, r := range releases {
+				fmt.Printf("  %d. %s - %s (%d, %s, %d tracks)\n", i+1, r.Artist, r.Title, r.Year, r.Country, r.TrackCount)
+			}
+			fmt.Print("\nSelect release (1): ")
+
+			reader := bufio.NewReader(os.Stdin)
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(input)
+
+			choice := 1
+			if input != "" {
+				if n, err := strconv.Atoi(input); err == nil && n >= 1 && n <= len(releases) {
+					choice = n
+				}
+			}
+			release = &releases[choice-1]
+		}
+
+		// Get full track info
+		fmt.Println("\nFetching track details...")
+		fullRelease, err = client.GetReleaseTracks(release.MBID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get track info: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Fetch cover art (optional)
+		fmt.Print("Fetching cover art... ")
+		coverArt, coverMIME, err = client.GetCoverArt(release.MBID)
+		if err != nil {
+			fmt.Printf("Warning: %v\n", err)
+			coverArt = nil // Ensure we continue without cover
+		} else if coverArt == nil {
+			fmt.Println("not available")
+		} else {
+			fmt.Printf("OK (%d KB, %s)\n", len(coverArt)/1024, coverMIME)
+		}
+
+		// Validate track count
+		if len(fullRelease.Tracks) != len(wavFiles) {
+			fmt.Fprintf(os.Stderr, "Warning: Track count mismatch (%d WAV files, %d tracks in release)\n",
+				len(wavFiles), len(fullRelease.Tracks))
+		}
+
+		discNum = 0 // MusicBrainz doesn't tell us which disc we ripped
 	}
 
 	// Determine destination
@@ -215,7 +269,7 @@ func main() {
 		if fullRelease.Compilation {
 			filename = encode.GenerateCompilationFilename(
 				fullRelease.Title,
-				0, // disc
+				discNum,
 				trackNum,
 				trackArtist,
 				trackTitle,
@@ -224,7 +278,7 @@ func main() {
 			filename = encode.GenerateFilename(
 				fullRelease.Artist,
 				fullRelease.Title,
-				0, // disc
+				discNum,
 				trackNum,
 				trackTitle,
 			)
@@ -260,7 +314,10 @@ func main() {
 			Title:        trackTitle,
 			TrackNum:     trackNum,
 			TrackTotal:   len(fullRelease.Tracks),
+			DiscNum:      discNum,
+			DiscTotal:    fullRelease.DiscCount,
 			Year:         fullRelease.Year,
+			Genre:        genre,
 			Compilation:  fullRelease.Compilation,
 			CoverArt:     coverArt,
 			CoverArtMIME: coverMIME,
