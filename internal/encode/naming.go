@@ -3,6 +3,11 @@ package encode
 import (
 	"fmt"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 // GenerateFilename creates a filename from track metadata.
@@ -11,10 +16,14 @@ import (
 // Format: Artist-Album-NN-Title.mp3
 // Multi-disc: Artist-Album-CDN-NN-Title.mp3
 //
-// Character handling (matches cd-overlap convention):
+// Character handling:
+// - Non-ASCII → normalized to ASCII equivalents (ō→o, é→e)
 // - Spaces → underscores
-// - / and \ → underscores (only illegal chars)
-// - All other chars preserved (apostrophes, colons, etc.)
+// - / and \ → underscores (filesystem-illegal)
+// - Shell metacharacters ($ ! * ? & ; | < > etc.) → underscores
+// - Quotes (' " `) → removed
+// - Multiple consecutive underscores → collapsed to single underscore
+// - Leading/trailing underscores → trimmed
 func GenerateFilename(artist, album string, disc, track int, title string) string {
 	// Sanitize each component
 	artist = sanitize(artist)
@@ -70,10 +79,16 @@ func GenerateCompilationFilename(compilation string, disc, track int, trackArtis
 
 // sanitize prepares a string for use in a filename.
 // Replaces characters that are illegal or require shell quoting.
+// Normalizes non-ASCII characters to ASCII equivalents (ō→o, é→e, etc.).
+// Collapses multiple consecutive underscores to a single underscore.
 func sanitize(s string) string {
+	// First normalize non-ASCII to ASCII equivalents
+	s = normalizeToASCII(s)
+
 	var b strings.Builder
 	b.Grow(len(s))
 
+	lastWasUnderscore := false
 	for _, r := range s {
 		switch r {
 		// Remove quotes (require shell escaping)
@@ -82,26 +97,48 @@ func sanitize(s string) string {
 
 		// Replace with underscore
 		case ' ': // space
-			b.WriteByte('_')
+			fallthrough
 		case '/', '\\': // filesystem-illegal
-			b.WriteByte('_')
+			fallthrough
 		case '$', '!': // shell expansion
-			b.WriteByte('_')
+			fallthrough
 		case '*', '?', '[', ']': // glob patterns
-			b.WriteByte('_')
+			fallthrough
 		case '(', ')': // subshell
-			b.WriteByte('_')
+			fallthrough
 		case '{', '}': // brace expansion
-			b.WriteByte('_')
+			fallthrough
 		case '<', '>', '|': // redirection/pipe
-			b.WriteByte('_')
+			fallthrough
 		case '&', ';': // background/separator
-			b.WriteByte('_')
+			if !lastWasUnderscore {
+				b.WriteByte('_')
+				lastWasUnderscore = true
+			}
 
 		default:
 			b.WriteRune(r)
+			lastWasUnderscore = r == '_'
 		}
 	}
 
+	// Trim leading/trailing underscores
+	return strings.Trim(b.String(), "_")
+}
+
+// normalizeToASCII converts non-ASCII characters to their ASCII equivalents.
+// Uses NFKD normalization to decompose characters (ō→o, é→e, etc.)
+// and strips any remaining non-ASCII characters.
+func normalizeToASCII(s string) string {
+	t := transform.Chain(norm.NFKD, runes.Remove(runes.In(unicode.Mn)))
+	result, _, _ := transform.String(t, s)
+
+	// Strip any remaining non-ASCII
+	var b strings.Builder
+	for _, r := range result {
+		if r < 128 {
+			b.WriteRune(r)
+		}
+	}
 	return b.String()
 }

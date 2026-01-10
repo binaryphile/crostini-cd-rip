@@ -64,10 +64,10 @@ func TestGenerateFilename_RemovesDoubleQuotes(t *testing.T) {
 	}
 }
 
-func TestGenerateFilename_KeepsSmartQuotes(t *testing.T) {
-	// Smart/curly quotes are shell-safe (no escaping needed)
+func TestGenerateFilename_RemovesSmartQuotes(t *testing.T) {
+	// Smart/curly quotes are non-ASCII so they get removed
 	got := GenerateFilename("Artist", "Album", 0, 1, "\u201cSmart\u201d \u2018Quotes\u2019")
-	want := "Artist-Album-01-\u201cSmart\u201d_\u2018Quotes\u2019.mp3"
+	want := "Artist-Album-01-Smart_Quotes.mp3"
 
 	if got != want {
 		t.Errorf("GenerateFilename() = %q, want %q", got, want)
@@ -75,9 +75,9 @@ func TestGenerateFilename_KeepsSmartQuotes(t *testing.T) {
 }
 
 func TestGenerateFilename_ShellSafe(t *testing.T) {
-	// Verify shell-special characters are replaced
+	// Verify shell-special characters are replaced, trailing underscores trimmed
 	got := GenerateFilename("Test$Artist", "Album!", 0, 1, "Song?")
-	want := "Test_Artist-Album_-01-Song_.mp3"
+	want := "Test_Artist-Album-01-Song.mp3"
 
 	if got != want {
 		t.Errorf("GenerateFilename() = %q, want %q", got, want)
@@ -166,9 +166,9 @@ func TestGenerateFilename_KeepsColon(t *testing.T) {
 
 func TestGenerateFilename_MultiDisc(t *testing.T) {
 	// Multi-disc: disc > 0 adds CDN prefix
-	// Note: ? is replaced with _ for shell safety
+	// Note: ? is replaced with underscore then trimmed
 	got := GenerateFilename("Pink Floyd", "The Wall", 1, 1, "In the Flesh?")
-	want := "Pink_Floyd-The_Wall-CD1-01-In_the_Flesh_.mp3"
+	want := "Pink_Floyd-The_Wall-CD1-01-In_the_Flesh.mp3"
 
 	if got != want {
 		t.Errorf("GenerateFilename() = %q, want %q", got, want)
@@ -228,6 +228,37 @@ func TestGenerateCompilationFilename_SlashInArtist(t *testing.T) {
 
 	if got != want {
 		t.Errorf("GenerateCompilationFilename() = %q, want %q", got, want)
+	}
+}
+
+func TestGenerateFilename_CollapsesUnderscores(t *testing.T) {
+	// "Heavy D & The Boyz" has " & " which becomes "___" without collapsing
+	got := GenerateFilename("Heavy D & The Boyz", "Album", 0, 1, "Song")
+	want := "Heavy_D_The_Boyz-Album-01-Song.mp3"
+
+	if got != want {
+		t.Errorf("GenerateFilename() = %q, want %q", got, want)
+	}
+}
+
+func TestGenerateFilename_CollapsesUnderscores_Multiple(t *testing.T) {
+	// Multiple consecutive special chars should collapse
+	// Leading/trailing underscores are trimmed
+	got := GenerateFilename("A & B", "C (D) [E]", 0, 1, "F / G")
+	want := "A_B-C_D_E-01-F_G.mp3"
+
+	if got != want {
+		t.Errorf("GenerateFilename() = %q, want %q", got, want)
+	}
+}
+
+func TestGenerateFilename_NonASCII(t *testing.T) {
+	// Non-ASCII should be normalized to ASCII equivalents
+	got := GenerateFilename("Tone-Lōc", "Album", 0, 1, "Café")
+	want := "Tone-Loc-Album-01-Cafe.mp3"
+
+	if got != want {
+		t.Errorf("GenerateFilename() = %q, want %q", got, want)
 	}
 }
 
