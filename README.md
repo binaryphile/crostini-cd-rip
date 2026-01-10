@@ -52,8 +52,7 @@ nix-shell  # Uses shell.nix
 sudo apt install libusb-1.0-0-dev lame
 
 # Build
-go build -o bin/cd-rip ./cmd/cd-rip
-go build -o bin/cd-encode ./cmd/cd-encode
+make
 ```
 
 ### Install
