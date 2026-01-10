@@ -168,7 +168,7 @@ Default is 75 frames. At ~317 frames/sec, a 60-minute CD rips in ~14 minutes.
 
 ## Claude Code Integration (Optional)
 
-When MusicBrainz doesn't recognize a disc, you can use Claude to extract metadata from Discogs. Add this to your project's `CLAUDE.md`:
+When MusicBrainz doesn't recognize a disc (or returns too many ambiguous matches), you can use Claude to extract metadata from any source. Add this to your project's `CLAUDE.md`:
 
 ```markdown
 ## CD Encoding Workflow

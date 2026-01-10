@@ -55,17 +55,53 @@ When MusicBrainz doesn't have your disc, provide metadata as JSON.
 }
 ```
 
-## For Claude: Extracting from Discogs
+## Example: Multi-Disc Set (Disc 1)
 
-When user provides a Discogs page (markdown or HTML):
+```json
+{
+  "artist": "The Beatles",
+  "album": "The White Album",
+  "year": "1968",
+  "genre": "Rock",
+  "disc": 1,
+  "totalDiscs": 2,
+  "totalTracks": 17,
+  "tracks": [
+    {"num": 1, "title": "Back in the U.S.S.R."},
+    {"num": 2, "title": "Dear Prudence"},
+    {"num": 3, "title": "Glass Onion"}
+  ]
+}
+```
 
-1. Find album title (usually in heading)
-2. Find artist - look for "Various" or specific artist name
+Rip and encode each disc separately. The `disc` field ensures filenames include `CD1`, `CD2`, etc.
+
+## For Claude: Extracting Metadata
+
+This workflow is format-agnostic. Users may provide metadata from any source:
+- Discogs page (markdown or HTML download)
+- AllMusic or Wikipedia
+- CD liner notes (typed or photographed)
+- Amazon or other retailer listing
+
+### Extraction Steps
+
+1. Find album title (usually in heading or product name)
+2. Find artist - look for "Various" or "Various Artists" for compilations
 3. Find year in release info
-4. Extract tracklist table:
-   - Position column → track number (handle "1-1" format for multi-disc)
-   - Artist column → track artist
-   - Title column → track title
+4. Extract tracklist:
+   - Position → track number (handle "1-1", "A1", "1.01" formats for multi-disc)
+   - Artist → track artist (for compilations)
+   - Title → track title
 5. Output as JSON matching schema above
 6. Save to /tmp/metadata.json
 7. Run: `cd-encode --metadata /tmp/metadata.json /tmp/cd-rip`
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Track count mismatch | Verify `totalTracks` matches WAV file count in /tmp/cd-rip |
+| Wrong disc | Check `disc` field matches the physical disc ripped |
+| Encoding fails | Ensure track numbers are sequential starting at 1 |
+| Missing track artist | Required for compilations (`artist: "Various Artists"`) |
