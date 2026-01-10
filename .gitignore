@@ -5,6 +5,5 @@ __pycache__/
 .nix-*
 result
 
-# Binaries (at root only)
-/cd-rip
-/cd-encode
+# Binaries
+bin/
