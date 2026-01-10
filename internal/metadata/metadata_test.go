@@ -68,7 +68,87 @@ func TestParseJSON_MultiDisc(t *testing.T) {
 	}
 }
 
-func TestParseJSON_MissingArtist(t *testing.T) {
+func TestValidate_MissingFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		album    *Album
+		wavCount int
+		wantErr  string
+	}{
+		{
+			name: "missing artist",
+			album: &Album{
+				AlbumTitle: "Test Album",
+				Tracks:     []Track{{Num: 1, Title: "Song"}},
+			},
+			wavCount: 1,
+			wantErr:  "artist",
+		},
+		{
+			name: "missing album",
+			album: &Album{
+				Artist: "Test",
+				Tracks: []Track{{Num: 1, Title: "Song"}},
+			},
+			wavCount: 1,
+			wantErr:  "album",
+		},
+		{
+			name: "missing tracks",
+			album: &Album{
+				Artist:     "Test",
+				AlbumTitle: "Test Album",
+				Tracks:     []Track{},
+			},
+			wavCount: 0,
+			wantErr:  "tracks",
+		},
+		{
+			name: "track count mismatch",
+			album: &Album{
+				Artist:     "Test",
+				AlbumTitle: "Test Album",
+				Tracks:     []Track{{Num: 1, Title: "Song"}},
+			},
+			wavCount: 5,
+			wantErr:  "mismatch",
+		},
+		{
+			name: "compilation missing track artist",
+			album: &Album{
+				Artist:     "Various Artists",
+				AlbumTitle: "Compilation",
+				Tracks: []Track{
+					{Num: 1, Title: "Song 1", Artist: "Artist 1"},
+					{Num: 2, Title: "Song 2", Artist: ""},
+				},
+			},
+			wavCount: 2,
+			wantErr:  "track 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := tt.album.Validate(tt.wavCount)
+			if len(errs) == 0 {
+				t.Fatalf("expected validation error containing %q", tt.wantErr)
+			}
+			found := false
+			for _, e := range errs {
+				if strings.Contains(e.Error(), tt.wantErr) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error containing %q, got %v", tt.wantErr, errs)
+			}
+		})
+	}
+}
+
+func TestParseJSON_MissingArtistFile(t *testing.T) {
 	album, err := ParseJSON("testdata/missing_artist.json")
 	if err != nil {
 		t.Fatalf("ParseJSON error: %v", err)
@@ -76,50 +156,6 @@ func TestParseJSON_MissingArtist(t *testing.T) {
 	errs := album.Validate(3)
 	if len(errs) == 0 {
 		t.Error("expected validation error for missing artist")
-	}
-	found := false
-	for _, e := range errs {
-		if strings.Contains(e.Error(), "artist") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected error mentioning 'artist'")
-	}
-}
-
-func TestParseJSON_MissingAlbum(t *testing.T) {
-	album := &Album{
-		Artist: "Test",
-		Tracks: []Track{{Num: 1, Title: "Song"}},
-	}
-	errs := album.Validate(1)
-	found := false
-	for _, e := range errs {
-		if strings.Contains(e.Error(), "album") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected error mentioning 'album'")
-	}
-}
-
-func TestParseJSON_MissingTracks(t *testing.T) {
-	album := &Album{
-		Artist:     "Test",
-		AlbumTitle: "Test Album",
-		Tracks:     []Track{},
-	}
-	errs := album.Validate(0)
-	found := false
-	for _, e := range errs {
-		if strings.Contains(e.Error(), "tracks") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected error mentioning 'tracks'")
 	}
 }
 
@@ -167,66 +203,28 @@ func TestToRelease_FieldMapping(t *testing.T) {
 }
 
 func TestToRelease_Compilation(t *testing.T) {
-	album := &Album{
-		Artist:     "Various Artists",
-		AlbumTitle: "Hits",
-		Tracks:     []Track{{Num: 1, Title: "Song", Artist: "Someone"}},
+	tests := []struct {
+		name   string
+		artist string
+		want   bool
+	}{
+		{"Various Artists is compilation", "Various Artists", true},
+		{"single artist not compilation", "Pink Floyd", false},
+		{"lowercase various not compilation", "various artists", false},
 	}
-	release := album.ToRelease()
-	if !release.Compilation {
-		t.Error("Compilation should be true for Various Artists")
-	}
-}
 
-func TestToRelease_NotCompilation(t *testing.T) {
-	album := &Album{
-		Artist:     "Pink Floyd",
-		AlbumTitle: "The Wall",
-		Tracks:     []Track{{Num: 1, Title: "Song"}},
-	}
-	release := album.ToRelease()
-	if release.Compilation {
-		t.Error("Compilation should be false for single artist")
-	}
-}
-
-func TestValidate_TrackCountMismatch(t *testing.T) {
-	album := &Album{
-		Artist:     "Test",
-		AlbumTitle: "Test Album",
-		Tracks:     []Track{{Num: 1, Title: "Song"}},
-	}
-	errs := album.Validate(5) // 5 WAV files but only 1 track
-	found := false
-	for _, e := range errs {
-		if strings.Contains(e.Error(), "mismatch") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected error mentioning 'mismatch'")
-	}
-}
-
-func TestValidate_MissingTrackArtist(t *testing.T) {
-	album := &Album{
-		Artist:     "Various Artists",
-		AlbumTitle: "Compilation",
-		Tracks: []Track{
-			{Num: 1, Title: "Song 1", Artist: "Artist 1"},
-			{Num: 2, Title: "Song 2", Artist: ""}, // missing artist
-			{Num: 3, Title: "Song 3", Artist: "Artist 3"},
-		},
-	}
-	errs := album.Validate(3)
-	found := false
-	for _, e := range errs {
-		if strings.Contains(e.Error(), "track 2") && strings.Contains(e.Error(), "artist") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected error about track 2 missing artist")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			album := &Album{
+				Artist:     tt.artist,
+				AlbumTitle: "Test",
+				Tracks:     []Track{{Num: 1, Title: "Song"}},
+			}
+			release := album.ToRelease()
+			if release.Compilation != tt.want {
+				t.Errorf("Compilation = %v, want %v", release.Compilation, tt.want)
+			}
+		})
 	}
 }
 
@@ -242,52 +240,43 @@ func TestValidate_AllFieldsPresent(t *testing.T) {
 	}
 }
 
-func TestLoadCoverArt_JPEG(t *testing.T) {
-	album := &Album{CoverArt: "testdata/cover.jpg"}
-	data, mime, err := album.LoadCoverArt()
-	if err != nil {
-		t.Fatalf("LoadCoverArt error: %v", err)
+func TestLoadCoverArt(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		wantMIME string
+		wantData bool
+		wantErr  bool
+	}{
+		{"JPEG file", "testdata/cover.jpg", "image/jpeg", true, false},
+		{"PNG file", "testdata/cover.png", "image/png", true, false},
+		{"not found", "testdata/nonexistent.jpg", "", false, true},
+		{"empty path", "", "", false, false},
 	}
-	if len(data) == 0 {
-		t.Error("expected non-empty data")
-	}
-	if mime != "image/jpeg" {
-		t.Errorf("MIME = %q, want %q", mime, "image/jpeg")
-	}
-}
 
-func TestLoadCoverArt_PNG(t *testing.T) {
-	album := &Album{CoverArt: "testdata/cover.png"}
-	data, mime, err := album.LoadCoverArt()
-	if err != nil {
-		t.Fatalf("LoadCoverArt error: %v", err)
-	}
-	if len(data) == 0 {
-		t.Error("expected non-empty data")
-	}
-	if mime != "image/png" {
-		t.Errorf("MIME = %q, want %q", mime, "image/png")
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			album := &Album{CoverArt: tt.path}
+			data, mime, err := album.LoadCoverArt()
 
-func TestLoadCoverArt_NotFound(t *testing.T) {
-	album := &Album{CoverArt: "testdata/nonexistent.jpg"}
-	_, _, err := album.LoadCoverArt()
-	if err == nil {
-		t.Error("expected error for nonexistent file")
-	}
-}
-
-func TestLoadCoverArt_Empty(t *testing.T) {
-	album := &Album{CoverArt: ""}
-	data, mime, err := album.LoadCoverArt()
-	if err != nil {
-		t.Fatalf("LoadCoverArt error: %v", err)
-	}
-	if data != nil {
-		t.Error("expected nil data for empty CoverArt")
-	}
-	if mime != "" {
-		t.Error("expected empty MIME for empty CoverArt")
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantData && len(data) == 0 {
+				t.Error("expected non-empty data")
+			}
+			if !tt.wantData && data != nil {
+				t.Error("expected nil data")
+			}
+			if mime != tt.wantMIME {
+				t.Errorf("MIME = %q, want %q", mime, tt.wantMIME)
+			}
+		})
 	}
 }
