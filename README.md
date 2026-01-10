@@ -166,6 +166,24 @@ Default is 75 frames. At ~317 frames/sec, a 60-minute CD rips in ~14 minutes.
 └── go.mod
 ```
 
+## Claude Code Integration (Optional)
+
+When MusicBrainz doesn't recognize a disc, you can use Claude to extract metadata from Discogs. Add this to your project's `CLAUDE.md`:
+
+```markdown
+## CD Encoding Workflow
+
+When MusicBrainz lookup fails:
+1. User provides Discogs page (markdown or HTML download)
+2. Extract metadata to JSON per docs/metadata-format.md
+3. Save to /tmp/metadata.json
+4. Run: cd-encode --metadata /tmp/metadata.json /tmp/cd-rip
+
+See docs/metadata-format.md for JSON schema and extraction instructions.
+```
+
+See [docs/use-cases.md](docs/use-cases.md) for full workflow documentation.
+
 ## License
 
 MIT
