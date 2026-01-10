@@ -131,3 +131,40 @@ func TestMetadata_StrictValidation(t *testing.T) {
 		t.Errorf("expected 'Validation failed' message:\n%s", output)
 	}
 }
+
+func TestMetadata_FileNotFound(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create WAV file but no metadata file
+	f, _ := os.Create(filepath.Join(dir, "track01.wav"))
+	f.Close()
+
+	cmd := exec.Command("go", "run", ".", "--metadata", "/nonexistent/metadata.json", "--dry-run", dir)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Errorf("should fail when metadata file not found:\n%s", output)
+	}
+	if !strings.Contains(string(output), "read metadata") {
+		t.Errorf("expected 'read metadata' error message:\n%s", output)
+	}
+}
+
+func TestMetadata_MalformedJSON(t *testing.T) {
+	dir := t.TempDir()
+
+	f, _ := os.Create(filepath.Join(dir, "track01.wav"))
+	f.Close()
+
+	// Write invalid JSON
+	metaPath := filepath.Join(dir, "metadata.json")
+	os.WriteFile(metaPath, []byte(`{"artist": "Test", invalid`), 0644)
+
+	cmd := exec.Command("go", "run", ".", "--metadata", metaPath, "--dry-run", dir)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Errorf("should fail on malformed JSON:\n%s", output)
+	}
+	if !strings.Contains(string(output), "parse metadata") {
+		t.Errorf("expected 'parse metadata' error message:\n%s", output)
+	}
+}
