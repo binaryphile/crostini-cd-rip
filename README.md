@@ -52,8 +52,17 @@ nix-shell  # Uses shell.nix
 sudo apt install libusb-1.0-0-dev lame
 
 # Build
-go build -o cd-rip ./cmd/cd-rip
-go build -o cd-encode ./cmd/cd-encode
+go build -o bin/cd-rip ./cmd/cd-rip
+go build -o bin/cd-encode ./cmd/cd-encode
+```
+
+### Install
+
+Symlink to `~/.local/bin` for PATH access. Rebuilds update automatically.
+
+```bash
+ln -s "$(pwd)/bin/cd-rip" ~/.local/bin/
+ln -s "$(pwd)/bin/cd-encode" ~/.local/bin/
 ```
 
 ## Usage
