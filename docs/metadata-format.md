@@ -93,9 +93,26 @@ This workflow is format-agnostic. Users may provide metadata from any source:
    - Position → track number (handle "1-1", "A1", "1.01" formats for multi-disc)
    - Artist → track artist (for compilations)
    - Title → track title
-5. Output as JSON matching schema above
-6. Save to /tmp/metadata.json
-7. Run: `cd-encode --metadata /tmp/metadata.json /tmp/cd-rip`
+5. Normalize characters (see below)
+6. Output as JSON matching schema above
+7. Save to /tmp/metadata.json
+8. Pre-flight check: `ls /tmp/cd-rip/*.wav | wc -l` should match track count
+9. Run: `cd-encode --metadata /tmp/metadata.json /tmp/cd-rip`
+
+### Character Normalization
+
+Normalize text when extracting to avoid encoding issues in filenames and tags:
+
+| Source Character | Replace With |
+|------------------|--------------|
+| Smart quotes `"` `"` `'` `'` | Straight quotes `"` `'` |
+| En/em dashes `–` `—` | Hyphen `-` |
+| Ellipsis `…` | Three periods `...` |
+| Accented letters `é` `ö` `ñ` | Keep as-is (encoder handles) |
+| Non-breaking space | Regular space |
+| Fancy apostrophes `'` | Straight apostrophe `'` |
+
+The encoder's `sanitize()` function handles most edge cases, but clean input prevents surprises.
 
 ### Troubleshooting
 
