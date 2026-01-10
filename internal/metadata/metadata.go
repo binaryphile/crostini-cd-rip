@@ -1,3 +1,6 @@
+// Package metadata provides JSON parsing for manual album metadata input.
+// Used when MusicBrainz lookup fails or returns ambiguous results.
+// See docs/metadata-format.md for the JSON schema.
 package metadata
 
 import (

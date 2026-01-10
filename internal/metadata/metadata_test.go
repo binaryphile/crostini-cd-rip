@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+// Example shows typical usage of the metadata package.
+func Example() {
+	album, err := ParseJSON("testdata/standard_album.json")
+	if err != nil {
+		panic(err)
+	}
+
+	// Validate against WAV file count
+	if errs := album.Validate(4); len(errs) > 0 {
+		for _, e := range errs {
+			println("Warning:", e.Error())
+		}
+	}
+
+	// Convert to Release for encoding pipeline
+	release := album.ToRelease()
+	_ = release
+}
+
 func TestParseJSON_StandardAlbum(t *testing.T) {
 	album, err := ParseJSON("testdata/standard_album.json")
 	if err != nil {
@@ -278,5 +297,29 @@ func TestLoadCoverArt(t *testing.T) {
 				t.Errorf("MIME = %q, want %q", mime, tt.wantMIME)
 			}
 		})
+	}
+}
+
+// Benchmarks
+
+func BenchmarkParseJSON(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseJSON("testdata/standard_album.json")
+	}
+}
+
+func BenchmarkToRelease(b *testing.B) {
+	album, _ := ParseJSON("testdata/standard_album.json")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = album.ToRelease()
+	}
+}
+
+func BenchmarkValidate(b *testing.B) {
+	album, _ := ParseJSON("testdata/standard_album.json")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = album.Validate(4)
 	}
 }
