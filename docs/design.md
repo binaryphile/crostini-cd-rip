@@ -226,6 +226,21 @@ type Track struct {
 }
 ```
 
+**ParseJSON()** - Read and unmarshal JSON file:
+```go
+func ParseJSON(path string) (*Album, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return nil, fmt.Errorf("read metadata: %w", err)
+    }
+    var album Album
+    if err := json.Unmarshal(data, &album); err != nil {
+        return nil, fmt.Errorf("parse metadata: %w", err)
+    }
+    return &album, nil
+}
+```
+
 **ToRelease()** - Convert JSON Album to musicbrainz.Release:
 ```go
 func (a *Album) ToRelease() *musicbrainz.Release {
